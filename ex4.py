@@ -69,7 +69,7 @@ def write_results_to_file(file, results, loss, acc):
         fd.write("{}\t\t{}\t\t{}\n".format(l,p,h))
     fd.close()
 
-def main(args):
+def main():
     prepare()
     trainer = train.get_trainer(snli_train, snli_dev, glove_txt)
     trainer.train()
@@ -77,3 +77,5 @@ def main(args):
     write_results_to_file("first_time", results, loss, accuracy)
     print("Done!!!!!!")
 
+if __name__ == '__main__':
+    main()

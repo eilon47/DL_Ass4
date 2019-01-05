@@ -99,7 +99,7 @@ class MlpArgs(object):
         self.in_dim = 1200
         self.hid_dim = 300
         self.out_dim = 3
-        self.activation = torch.nn.ReLU
+        self.activation = torch.tanh
 
     def __str__(self):
         s = FORMAT.format(self.__class__.__name__)

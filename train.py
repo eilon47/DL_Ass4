@@ -8,6 +8,10 @@ from shared import SeqArgs, CnnCharArgs, MlpArgs, TrainerArgs, SnliArgs
 
 
 def get_trainer(train, dev, pre_trained_file):
+    if isinstance(train, str):
+        train = open(train, "r")
+    if isinstance(dev, str):
+        dev = open(dev, "r")
     train_ds = SNLI(train, pre_trained_file)
     dev_ds = SNLI(dev, pre_trained_file)
 

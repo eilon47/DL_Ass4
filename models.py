@@ -78,10 +78,9 @@ class MLP(nn.Module):
         # useful info in forward function
         self.layer = nn.Linear(args.in_dim, args.hid_dim)
         self.output_layer = nn.Linear(args.hid_dim, args.out_dim)
-        self.activation = args.sigmoid
+        self.activation = args.activation
 
-    def forward(self, premise, hypothesis):
-        x = tc.cat([premise, hypothesis, (premise - hypothesis), (premise * hypothesis)], dim=1)
+    def forward(self, x):
         x = self.layer(x)
         x = self.activation(x)
         x = self.output_layer(x)
@@ -104,7 +103,8 @@ class SNLIModel(nn.Module):
     def forward(self, premise_words, premise_char, hypothesis_words, hypothesis_char):
         premise_v = self.premise_model(premise_words, self.char_level(premise_char))
         hypothesis_v = self.hypothesis_model(hypothesis_words, self.char_level(hypothesis_char))
-        return self.mlp_model(premise_v, hypothesis_v)
+        x = tc.cat([premise_v, hypothesis_v, (premise_v - hypothesis_v), (premise_v * hypothesis_v)], dim=1)
+        return self.mlp_model(x)
 
 
 class SNLITrainer(object):

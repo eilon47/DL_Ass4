@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pickle
 import torch as tc
-from shared import PAD, UNK, START, END, LABELS, snli_train, vocab_file, EM_DIM
+from shared import PAD, UNK, START, END, LABELS, snli_train, glove_txt, EM_DIM
 
 
 class SNLI(Dataset):
@@ -38,14 +38,14 @@ class SNLI(Dataset):
     def load(self, src=None):
         # load pickle if exists
         if src is None:
-            src = vocab_file
+            src = glove_txt
         src = src.strip(".txt") + ".pkl"
         if os.path.exists(src):
             return pickle.load(open(src, "rb"))
 
         words = [START, END, PAD, UNK]
         mat = [np.zeros(EM_DIM), np.zeros(EM_DIM), np.zeros(EM_DIM), np.zeros(EM_DIM)]
-        fd = open(vocab_file, "rt", encoding="utf-8")
+        fd = open(glove_txt, "rt", encoding="utf-8")
         for line in fd:
             word, vec = line.split(" ", 1)
             mat.append(np.fromstring(vec, sep=" "))  # append pre trained vector
@@ -110,7 +110,7 @@ class SNLI(Dataset):
 
 if __name__ == '__main__':
     import shared
-    dataset = SNLI(open(snli_train), shared.vocab_file)
+    dataset = SNLI(open(snli_train), shared.glove_txt)
     dataloader = DataLoader(dataset=dataset, batch_size=64, collate_fn=dataset.collate_fn)
     for i, (p, h, pw, hw, pc, wc, label) in enumerate(dataloader):
         print(i, p, pw, pc)

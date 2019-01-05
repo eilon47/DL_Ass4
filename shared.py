@@ -4,12 +4,17 @@ import torch
 data_dir = os.path._getfullpathname(__file__)
 data_dir = os.path.split(data_dir)[0]
 data_dir = os.path.join(data_dir, "data")
-glove_6b = "glove.6B.50d.txt"
-globe_dir = "GloVe_vocab"
-snli_file = os.path.join(data_dir, "snli_1.0", "snli_1.0_{}.txt")
+glove = "glove.6B.50d"
+glove_6b = glove+ ".{}"
+glove_dir = os.path.join(data_dir, "GloVe_vocab")
+glove_compressed = os.path.join(glove_dir, glove_6b.format("rar"))
+glove_txt = os.path.join(glove_dir, glove_6b.format("txt"))
+glove_download_url = ""
 
-# DATA FILES
-vocab_file = os.path.join(data_dir, globe_dir, glove_6b)
+snli_download_url = ""
+snli_dir = os.path.join(data_dir, "snli_1.0")
+snli_compressed = os.path.join(snli_dir, "snli_1.0.rar")
+snli_file = os.path.join(snli_dir, "snli_1.0_{}.txt")
 snli_train = snli_file.format("train")
 snli_dev = snli_file.format("dev")
 snli_test = snli_file.format("test")
@@ -94,7 +99,7 @@ class MlpArgs(object):
         self.in_dim = 1200
         self.hid_dim = 300
         self.out_dim = 3
-        self.sigmoid = torch.tanh
+        self.activation = torch.nn.ReLU
 
     def __str__(self):
         s = FORMAT.format(self.__class__.__name__)

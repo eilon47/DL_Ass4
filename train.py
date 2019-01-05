@@ -32,21 +32,13 @@ def test_ds(test_src, vocab):
     test.load(vocab)
 
 
-def write_results_to_file(file, results, loss, acc):
-    fd = open(file+"loss_and_acc", "w")
-    fd.write("accuracy is {}, loss is {}".format(loss, acc))
-    fd.close()
-    fd = open(file+"_predictions", "w")
-    for l,p,h in results:
-        fd.write("{}\t\t{}\t\t{}\n".format(l,p,h))
-    fd.close()
 
 if __name__ == '__main__':
     print(shared.snli_dev)
     print(shared.snli_train)
     train = open(shared.snli_train, 'r')
     dev = open(shared.snli_dev, 'r')
-    trainer = get_trainer(train, dev, shared.vocab_file)
+    trainer = get_trainer(train, dev, shared.glove_txt)
     print("in train")
     trainer.train()
 

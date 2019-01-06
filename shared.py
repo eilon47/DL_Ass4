@@ -1,19 +1,20 @@
 import os
 import torch
 
+compress = "zip"
 data_dir = os.path._getfullpathname(__file__)
 data_dir = os.path.split(data_dir)[0]
 data_dir = os.path.join(data_dir, "data")
 glove = "glove.6B.50d"
 glove_6b = glove+ ".{}"
 glove_dir = os.path.join(data_dir, "GloVe_vocab")
-glove_compressed = os.path.join(glove_dir, glove_6b.format("rar"))
+glove_compressed = os.path.join(glove_dir, glove_6b.format(compress))
 glove_txt = os.path.join(glove_dir, glove_6b.format("txt"))
 glove_download_url = ""
 
 snli_download_url = ""
 snli_dir = os.path.join(data_dir, "snli_1.0")
-snli_compressed = os.path.join(snli_dir, "snli_1.0.rar")
+snli_compressed = os.path.join(snli_dir, "snli_1.0.{}".format(compress))
 snli_file = os.path.join(snli_dir, "snli_1.0_{}.txt")
 snli_train = snli_file.format("train")
 snli_dev = snli_file.format("dev")
@@ -28,7 +29,7 @@ START = "$start$"
 END = "$end$"
 UNK = "UUUNKKK"
 PAD = "$pad$"
-GPU = True
+GPU = False
 EM_DIM = 50
 NUM_LAYERS = 3
 CHAR_VOCAB_DIM = 129

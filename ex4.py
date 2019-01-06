@@ -1,4 +1,5 @@
 import os
+import sys
 import zipfile
 import requests
 
@@ -20,6 +21,24 @@ def create_directories():
         os.mkdir(shared.snli_dir)
         print(f.format(shared.snli_dir))
 
+def download_file(url, file_name):
+    with open(file_name, "wb") as f:
+        print("Downloading "+ file_name)
+        response = requests.get(url, stream=True)
+        total_length = response.headers.get('content-length')
+
+        if total_length is None:  # no content length header
+            f.write(response.content)
+        else:
+            dl = 0
+            total_length = int(total_length)
+            for data in response.iter_content(chunk_size=4096):
+                dl += len(data)
+                f.write(data)
+                done = int(50 * dl / total_length)
+                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50 - done)))
+                sys.stdout.flush()
+
 
 def get_data_files():
     if not os.path.exists(shared.snli_compressed):
@@ -29,7 +48,7 @@ def get_data_files():
             print("One of the snli files is not exists - Download starts")
             path = os.path.curdir
             os.chdir(shared.snli_dir)
-            requests.get("https://nlp.stanford.edu/projects/snli/snli_1.0.zip")
+            download_file("https://nlp.stanford.edu/projects/snli/snli_1.0.zip","snli_1.0.zip")
             if not os.path.exists(shared.snli_compressed):
                 print("Problem in downloading file https://nlp.stanford.edu/projects/snli/snli_1.0.zip, exiting with error")
                 exit(-1)
@@ -41,7 +60,7 @@ def get_data_files():
         if not os.path.exists(shared.glove_txt):
             path = os.path.curdir
             os.chdir(shared.glove_dir)
-            requests.get("http://nlp.stanford.edu/data/wordvecs/"+shared.glove_6b.format("zip"))
+            download_file("http://nlp.stanford.edu/data/wordvecs/"+shared.glove_6b.format("zip"),shared.glove_6b.format("zip"))
             if not os.path.exists(shared.snli_compressed):
                 print("Problem in downloading file " +
                       "http://nlp.stanford.edu/data/wordvecs/"+shared.glove_6b.format("zip") + ", exiting with error")

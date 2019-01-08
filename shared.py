@@ -13,7 +13,8 @@ glove_txt = os.path.join(glove_dir, glove_6b.format("txt"))
 glove_download_url = ""
 
 snli_download_url = ""
-snli_dir = os.path.join(data_dir, "snli_1.0")
+snli_dir1 =  os.path.join(data_dir, "snli_1.0")
+snli_dir = os.path.join(data_dir, "snli_1.0", "snli_1.0")
 snli_compressed = os.path.join(snli_dir, "snli_1.0.{}".format(compress))
 snli_file = os.path.join(snli_dir, "snli_1.0_{}.txt")
 snli_train = snli_file.format("train")

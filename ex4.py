@@ -2,11 +2,11 @@ import os
 import sys
 import zipfile
 import requests
-
 from data_handler import SNLI
 from shared import snli_train, snli_dev, snli_test, glove_txt
 import shared
 import train
+
 
 def create_directories():
     print("Checking all directories exists")
@@ -17,9 +17,10 @@ def create_directories():
     if not os.path.exists(shared.glove_dir):
         os.mkdir(shared.glove_dir)
         print(f.format(shared.glove_dir))
-    if not os.path.exists(shared.snli_dir):
-        os.mkdir(shared.snli_dir)
-        print(f.format(shared.snli_dir))
+    if not os.path.exists(shared.snli_dir1):
+        os.mkdir(shared.snli_dir1)
+        print(f.format(shared.snli_dir1))
+
 
 def download_file(url, file_name):
     with open(file_name, "wb") as f:
@@ -38,6 +39,19 @@ def download_file(url, file_name):
                 done = int(50 * dl / total_length)
                 sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50 - done)))
                 sys.stdout.flush()
+    if not os.path.exists(file_name):
+        print("Problem in downloading file {}, exiting with error".format(url))
+        exit(-1)
+
+
+def extract_file(file_path, folder, members=None):
+    zip_file = zipfile.ZipFile(file_path, 'r')
+    try:
+        zip_file.extractall(folder, members=members)
+    except Exception as e:
+        print(e)
+        print("Problem in extracting file " + file_path + " to directory " + folder + ", exiting with error")
+        exit(-1)
 
 
 def get_data_files():
@@ -47,27 +61,22 @@ def get_data_files():
         if not all(snli):
             print("One of the snli files is not exists - Download starts")
             path = os.path.curdir
-            os.chdir(shared.snli_dir)
+            os.chdir(shared.snli_dir1)
             download_file("https://nlp.stanford.edu/projects/snli/snli_1.0.zip","snli_1.0.zip")
-            if not os.path.exists(shared.snli_compressed):
-                print("Problem in downloading file https://nlp.stanford.edu/projects/snli/snli_1.0.zip, exiting with error")
-                exit(-1)
-            zip_file = zipfile.ZipFile(shared.snli_compressed)
-            print("Extracting snli files")
-            zip_file.extractall(shared.os.curdir)
+            snli = [snli_test, snli_dev, snli_train]
+            snli = ["snli_1.0/" + os.path.split(s)[1] for s in snli]
+            extract_file(shared.snli_compressed, shared.snli_dir1, snli)
             os.chdir(path)
     if not os.path.exists(shared.glove_compressed):
         if not os.path.exists(shared.glove_txt):
             path = os.path.curdir
             os.chdir(shared.glove_dir)
-            download_file("http://nlp.stanford.edu/data/wordvecs/"+shared.glove_6b.format("zip"),shared.glove_6b.format("zip"))
+            download_file("http://nlp.stanford.edu/data/glove.6B.zip", "glove.6B.zip")
             if not os.path.exists(shared.snli_compressed):
                 print("Problem in downloading file " +
-                      "http://nlp.stanford.edu/data/wordvecs/"+shared.glove_6b.format("zip") + ", exiting with error")
+                      "http://nlp.stanford.edu/data/glove.6B.zip", "glove.6B.zip" + ", exiting with error")
                 exit(-1)
-            zip_file = zipfile.ZipFile(shared.snli_compressed)
-            print("Extracting Glove files")
-            zip_file.extractall(shared.os.curdir)
+            extract_file(shared.glove_compressed, shared.glove_dir)
             os.chdir(path)
 
 
@@ -76,7 +85,6 @@ def prepare():
     create_directories()
     get_data_files()
     print("Done preparing environment successfully")
-
 
 
 def write_results_to_file(file, results, loss, acc):
@@ -88,6 +96,7 @@ def write_results_to_file(file, results, loss, acc):
         fd.write("{}\t\t{}\t\t{}\n".format(l,p,h))
     fd.close()
 
+
 def main():
     prepare()
     trainer = train.get_trainer(snli_train, snli_dev, glove_txt)
@@ -96,5 +105,8 @@ def main():
     write_results_to_file("first_time", results, loss, accuracy)
     print("Done!!!!!!")
 
+
 if __name__ == '__main__':
+    extract_file("C:\\Users\\eilon\\Desktop\\אילון\\שנה ג\\DL_Ass4\\data\\snli_1.0\\snli_1.0.zip","C:\\Users\\eilon\\Desktop\\אילון\\שנה ג\\DL_Ass4\\data\\snli_1.0\\")
     main()
+

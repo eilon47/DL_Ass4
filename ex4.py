@@ -36,9 +36,11 @@ def download_file(url, file_name):
             for data in response.iter_content(chunk_size=4096):
                 dl += len(data)
                 f.write(data)
-                done = int(50 * dl / total_length)
-                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50 - done)))
+                done = int(100 * dl / total_length)
+                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (100 - done)))
+                sys.stdout.write(str(done) + "%")
                 sys.stdout.flush()
+        print("")
     if not os.path.exists(file_name):
         print("Problem in downloading file {}, exiting with error".format(url))
         exit(-1)
@@ -47,6 +49,7 @@ def download_file(url, file_name):
 def extract_file(file_path, folder, members=None):
     zip_file = zipfile.ZipFile(file_path, 'r')
     try:
+        print("Extracting file: " + file_path)
         zip_file.extractall(folder, members=members)
     except Exception as e:
         print(e)
@@ -55,29 +58,31 @@ def extract_file(file_path, folder, members=None):
 
 
 def get_data_files():
-    if not os.path.exists(shared.snli_compressed):
-        snli = [snli_test, snli_dev, snli_train]
-        snli = [os.path.exists(s) for s in snli]
-        if not all(snli):
-            print("One of the snli files is not exists - Download starts")
-            path = os.path.curdir
+    snli = [snli_test, snli_dev, snli_train]
+    snli = [os.path.exists(s) for s in snli]
+    path = os.path.curdir
+    if not all(snli):
+        print("One of the snli files is not exists")
+        if not os.path.exists(shared.snli_compressed):
+            print(shared.snli_compressed + " is not found, downloading")
             os.chdir(shared.snli_dir1)
             download_file("https://nlp.stanford.edu/projects/snli/snli_1.0.zip","snli_1.0.zip")
-            snli = [snli_test, snli_dev, snli_train]
-            snli = ["snli_1.0/" + os.path.split(s)[1] for s in snli]
-            extract_file(shared.snli_compressed, shared.snli_dir1, snli)
-            os.chdir(path)
-    if not os.path.exists(shared.glove_compressed):
-        if not os.path.exists(shared.glove_txt):
-            path = os.path.curdir
+        snli = [snli_test, snli_dev, snli_train]
+        snli = ["snli_1.0/" + os.path.split(s)[1] for s in snli]
+        extract_file(shared.snli_compressed, shared.snli_dir1, snli)
+        os.chdir(path)
+    path = os.path.curdir
+    if not os.path.exists(shared.glove_txt):
+        if not os.path.exists(shared.glove_compressed):
             os.chdir(shared.glove_dir)
             download_file("http://nlp.stanford.edu/data/glove.6B.zip", "glove.6B.zip")
             if not os.path.exists(shared.snli_compressed):
                 print("Problem in downloading file " +
                       "http://nlp.stanford.edu/data/glove.6B.zip", "glove.6B.zip" + ", exiting with error")
                 exit(-1)
-            extract_file(shared.glove_compressed, shared.glove_dir)
-            os.chdir(path)
+        members = [shared.glove_6b.format("txt")]
+        extract_file(shared.glove_compressed, shared.glove_dir, members=members)
+        os.chdir(path)
 
 
 def prepare():
@@ -107,6 +112,5 @@ def main():
 
 
 if __name__ == '__main__':
-    extract_file("C:\\Users\\eilon\\Desktop\\אילון\\שנה ג\\DL_Ass4\\data\\snli_1.0\\snli_1.0.zip","C:\\Users\\eilon\\Desktop\\אילון\\שנה ג\\DL_Ass4\\data\\snli_1.0\\")
     main()
 

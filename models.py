@@ -1,6 +1,6 @@
 import random
 from torch import nn
-from torch.nn import Conv2d, MaxPool1d
+from torch.nn import Conv2d, MaxPool1d, Dropout
 import torch as tc
 import torch.autograd as ag
 from torch.utils.data import DataLoader, Subset
@@ -41,47 +41,68 @@ def load_embedding(matrix, gpu=False, non_trainable=False):
         embedded_layer.weight.requires_grad = False
     return embedded_layer
 
+
 class SentenceLevelBiLSTM(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: shared.SeqArgs):
         super(SentenceLevelBiLSTM, self).__init__()
         # word embed layer
         self.E = load_embedding(args.pre_trained_embedded, args.gpu) if args.is_pre_trained \
             else nn.Embedding(args.word_vocab_dim, args.em_dim)
-        self.bilstm = nn.LSTM(args.em_dim + args.em_char_dim, args.lstm_dim, args.lstm_layers,
-                                   dropout=args.dropout, batch_first=True, bidirectional=True)
+        inp = args.em_dim + args.em_char_dim
+        self.bilstm1 = nn.LSTM(inp, args.lstm_dim, args.lstm_layers, batch_first=True, bidirectional=True)
+        self.dropout1 = Dropout(args.drop1)
+        inp = inp + 2 * args.lstm_dim
+        self.bilstm2 = nn.LSTM(inp, args.lstm_dim, args.lstm_layers,batch_first=True, bidirectional=True)
+        self.dropout2 = Dropout(args.drop2)
+        self.bilstm3 = nn.LSTM(inp, args.lstm_dim, args.lstm_layers,batch_first=True, bidirectional=True)
+        self.dropout3 = Dropout(args.drop3)
 
     def composition(self):
-        w, _ = self.bilstm.weight_hh_l0.chunk(2, 0)
-        norm_output = tc.norm(w, dim=1)
+        w, _, _, _ = self.bilstm2.weight_hh_l0.chunk(4, 0)
+        rw, _, _, _ = self.bilstm2.weight_hh_l0_reverse.chunk(4, 0)
+        norm_output = tc.norm(tc.cat([w, rw], dim=0), dim=1)
         attention_coefficient = norm_output / tc.sum(norm_output)
         return attention_coefficient
 
-    def forward(self, words_embed, chr_rep):
+    def forward(self, words_embed, chr_rep=None):
         composition_out = self.composition()
         avg_pool = nn.AvgPool1d(words_embed.shape[1], 1)
         max_pool = nn.MaxPool1d(words_embed.shape[1], 1)
 
         x = self.E(words_embed)
         x = tc.cat([x, chr_rep], dim=2)
-        output_seq, _ = self.bilstm(x)
 
-        avg_pool = avg_pool(output_seq.transpose(1, 2)).squeeze(dim=2)
-        max_pool = max_pool(output_seq.transpose(1, 2)).squeeze(dim=2)
-        gate_attention = tc.sum(output_seq * composition_out, dim=1)
+        out, _ = self.bilstm1(x)
+        out = self.dropout1(out)
+
+        inp = tc.cat([x, out], dim=2)
+        out, _ = self.bilstm2(inp)
+        out = self.dropout2(out)
+
+        inp = tc.cat([x, out], dim=2)
+        out, _ = self.bilstm3(inp)
+        out = self.dropout3(out)
+
+        avg_pool = avg_pool(out.transpose(1, 2)).squeeze(dim=2)
+        max_pool = max_pool(out.transpose(1, 2)).squeeze(dim=2)
+        gate_attention = tc.sum(out * composition_out, dim=1)
         x = tc.cat([gate_attention, avg_pool, max_pool], dim=1)
         return x
 
 
 class MLP(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args:shared.MlpArgs):
         super(MLP, self).__init__()
         # useful info in forward function
-        self.layer = nn.Linear(args.in_dim, args.hid_dim)
-        self.output_layer = nn.Linear(args.hid_dim, args.out_dim)
+        self.layer1 = nn.Linear(args.in_dim, args.hid_dim1)
+        self.layer2 = nn.Linear(args.hid_dim1, args.hid_dim2)
+        self.output_layer = nn.Linear(args.hid_dim2, args.out_dim)
         self.activation = args.activation
 
     def forward(self, x):
-        x = self.layer(x)
+        x = self.layer1(x)
+        x = self.activation(x)
+        x = self.layer2(x)
         x = self.activation(x)
         x = self.output_layer(x)
         x = nn.functional.softmax(x, dim=1)
@@ -89,16 +110,13 @@ class MLP(nn.Module):
 
 
 class SNLIModel(nn.Module):
-    def __init__(self, models_args):
+    def __init__(self, models_args: shared.SnliArgs):
         super(SNLIModel, self).__init__()
         self.char_level = CharLevelBiLSTM(models_args.char_level_params)
-        self.premise_model = SentenceLevelBiLSTM(models_args.premise_params)
-        self.hypothesis_model = SentenceLevelBiLSTM(models_args.hypo_params)
+        self.premise_model = SentenceLevelBiLSTM(models_args.seq_params1)
+        self.hypothesis_model = SentenceLevelBiLSTM(models_args.seq_params2)
         self.mlp_model = MLP(models_args.mlp_params)
-        self.optimizer = self.set_optimizer(models_args.LEARNING_RATE, models_args.OPTIMIZER)
-
-    def set_optimizer(self, lr, opt):
-        return opt(self.parameters(), lr=lr)
+        self.optimizer = models_args.OPTIMIZER(self.parameters(),lr=models_args.LEARNING_RATE)
 
     def forward(self, premise_words, premise_char, hypothesis_words, hypothesis_char):
         premise_v = self.premise_model(premise_words, self.char_level(premise_char))
@@ -118,10 +136,7 @@ class SNLITrainer(object):
         if self.gpu:
             self.model.cuda()
         self.load_data(train_data, dev_data)
-        self.loss_dev = []
-        self.loss_train = []
-        self.acc_dev = []
-        self.acc_train = []
+        self.loss_dev, self.loss_train,self.acc_dev, self.acc_train = [], [], [], []
 
     class Dummy:
         def __new__(self, d):
@@ -131,43 +146,41 @@ class SNLITrainer(object):
         self.train_loader, self.dev_loader = None, None
         if train_data is not None:
             self.train_loader = DataLoader(train_data, batch_size=self.batch,collate_fn=train_data.collate_fn,shuffle=True)
-            self.train_valid = DataLoader(Subset(train_data, list(set(random.sample(range(1, len(train_data)), int(0.11 * len(train_data)))))),
+            self.train_valid = DataLoader(Subset(train_data, list(set(random.sample(range(1, len(train_data)), int(0.10 * len(train_data)))))),
                                           batch_size=self.batch, collate_fn=train_data.collate_fn)
 
         if dev_data is not None:
             self.dev_loader = DataLoader(dev_data, batch_size=self.batch, collate_fn=train_data.collate_fn, shuffle=True)
 
     def validate_train_and_dev(self, i):
-        # validate Train
-        loss, accuracy = self.validate(self.train_valid)
-        self.loss_train.append((i, loss))
-        self.acc_train.append((i, accuracy))
-        # validate Dev
-        if self.dev_loader is not None:
-            loss, accuracy = self.validate(self.dev_loader)
-            self.loss_dev.append((i, loss))
-            self.acc_dev.append((i, accuracy))
+        with tc.no_grad():
+            loss, accuracy = self.validate(self.train_valid)
+            self.loss_train.append((i, loss))
+            self.acc_train.append((i, accuracy))
+            # validate Dev
+            if self.dev_loader is not None:
+                loss, accuracy = self.validate(self.dev_loader)
+                self.loss_dev.append((i, loss))
+                self.acc_dev.append((i, accuracy))
 
     def train(self):
         if self.train_loader is None:
             print("Can't train due to None in train loader")
             return
         print("train...")
-        self.loss_dev = []
-        self.loss_train = []
-        self.acc_dev = []
-        self.acc_train = []
+        self.loss_dev, self.loss_train,self.acc_dev, self.acc_train = [], [], [], []
+
         for epoch in range(self.epochs):
             print("epoch: {}".format(epoch))
             # set model to train mode
             self.model.train()
             # calc number of iteration in current epoch
             len_data = len(self.train_loader)
-            for i, (p, h, pw, hw, pc, hc, label) in enumerate(self.train_loader):
+            for i, (prem, hypo, premw, hypow, pc, hc, label) in enumerate(self.train_loader):
                 print("\r\r\r%d" % int(100 * (i + 1) / len_data) + "%")
-                pw, pc, hw, hc, label = self.create_input_to_model(pw, pc, hw, hc, label)
+                premw, pc, hypow, hc, label = self.create_input_to_model(premw, pc, hypow, hc, label)
                 self.model.zero_grad()
-                output = self.model(pw, pc, hw, hc)
+                output = self.model(premw, pc, hypow, hc)
                 loss = self.loss_func(output, label)
                 loss.backward()
                 self.model.optimizer.step()
@@ -175,6 +188,7 @@ class SNLITrainer(object):
                 if self.vrate and i % self.vrate == 0:
                     print("validating dev in epoch:" + "\t" + str(epoch + 1) + "/" + str(self.epochs))
                     self.validate_train_and_dev(epoch + (i / len_data))
+                    self.model.train()
 
     def validate(self, data):
         print("validating...")
@@ -231,25 +245,6 @@ class SNLITrainer(object):
 
 
 
-
-
-
-if __name__ == "__main__":
-    ds = SNLI(open(shared.snli_train, 'r'),shared.vocab_file )
-    charparams = CnnCharArgs(vocab_dim=ds.char_len)
-    premisparams, hypparams = SeqArgs(word_vocab_dim=ds.data_legth, pre_trained_embedded=ds.E),SeqArgs(word_vocab_dim=ds.data_legth, pre_trained_embedded=ds.E)
-    mlpparams = MlpArgs()
-    print(mlpparams)
-    model = SNLIModel(SnliArgs(charparams, premisparams, hypparams, mlpparams))
-    dl = DataLoader(
-        dataset=ds,
-        batch_size=64,
-        collate_fn=ds.collate_fn
-    )
-    for i, (p, h, pw, hw, pc, hc, label) in enumerate(dl):
-        out = model(pw, pc, hw, hc)
-        print(out)
-        e = 0
 
 
 

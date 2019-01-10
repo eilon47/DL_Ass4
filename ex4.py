@@ -6,7 +6,7 @@ from data_handler import SNLI
 from shared import snli_train, snli_dev, snli_test, glove_txt
 import shared
 import train
-
+import optparse
 
 def create_directories():
     print("Checking all directories exists")
@@ -101,12 +101,25 @@ def write_results_to_file(file, results, loss, acc):
         fd.write("{}\t\t{}\t\t{}\n".format(l,p,h))
     fd.close()
 
+#
+# option_parser = optparse.OptionParser()
+# option_parser.add_option("--train", dest="train_file", help="path to train file", default=None)
+# option_parser.add_option("--dev" , dest="dev_file", help="path to dev file", default=None)
+# option_parser.add_option("--test" , dest="test_file", help="path to test file", default=None)
+#
+# option_parser.add_option("-")
+#
+# option_parser.add_option("-f", "--fix", help="If you want to use prefix and suffix embedding matrices", dest="F", default=False, action="store_true")
+# option_parser.add_option("-p", "--plot", help="If you want to show plots", dest="plot", default=False, action="store_true")
+# option_parser.add_option("-l", "--lr", dest="lr", help="Choose the learning rate", default=None, type=float)
+# option_parser.add_option("-i", "--iter", dest="epochs", help="Choose the epochs", default=None, type=int)
+
 
 def main():
     prepare()
-    trainer = train.get_trainer(snli_train, snli_dev, glove_txt)
+    trainer = train.get_new_model_trainer(open(snli_train, "r"), glove_txt ,open(snli_dev, "r"))
     trainer.train()
-    results, loss, accuracy = trainer.predict(SNLI(open(snli_test, glove_txt)))
+    results, loss, accuracy = trainer.predict(SNLI(open(snli_test, "r"), glove_txt))
     write_results_to_file("first_time", results, loss, accuracy)
     print("Done!!!!!!")
 

@@ -7,43 +7,55 @@ import shared
 from shared import SeqArgs, CnnCharArgs, MlpArgs, TrainerArgs, SnliArgs
 
 
-def get_trainer(train, dev, pre_trained_file):
-    if isinstance(train, str):
-        train = open(train, "r")
-    if isinstance(dev, str):
-        dev = open(dev, "r")
-    train_ds = SNLI(train, pre_trained_file)
-    dev_ds = SNLI(dev, pre_trained_file)
 
-    charparams = CnnCharArgs(vocab_dim=train_ds.char_len)
-    premisparams, hypparams = SeqArgs(word_vocab_dim=train_ds.data_legth, pre_trained_embedded=train_ds.E), SeqArgs(
-        word_vocab_dim=train_ds.data_legth, pre_trained_embedded=train_ds.E)
-    mlpparams = MlpArgs()
-    print(mlpparams)
-    model = SNLIModel(SnliArgs(charparams, premisparams, hypparams, mlpparams))
-
-    snli_trainer = SNLITrainer(model, TrainerArgs(),train_ds, dev_ds)
-    return snli_trainer
+def load_datasets(train_src, pre_trained_src, dev_src=None):
+    dev = None
+    train = SNLI(train_src, pre_trained_src)
+    if dev_src:
+        dev = SNLI(dev_src)
+        dev.load_word_vocabulary((train.word_embedded, train.index2word))
+    return train, dev
 
 
-def get_trainer_with_data(model_file):
-    model, params, vocab = pickle.load(open(os.path.join("..", "pkl", model_file + ".trained_model"), "rb"))
+def model(dataset:SNLI):
+    params = SnliArgs(char_level_params=CnnCharArgs(vocab=dataset.char_len),
+                      seq_params1=SeqArgs(word_vocab_dim=len(dataset.index2word), pre_trained_embedded=dataset.E),
+                      seq_params2=SeqArgs(word_vocab_dim=len(dataset.index2word)),
+                      mlp_params=MlpArgs())
+    return SNLIModel(params)
+
+
+def get_trainer(m, train, dev):
+    params = TrainerArgs()
+    return SNLITrainer(model=m,args=params,train_data=train, dev_data=dev)
+
+
+def get_new_model_trainer(train_src, pre_trained_src, dev_src=None):
+    train, dev = load_datasets(train_src, pre_trained_src, dev_src)
+    mod = model(train)
+    print("trainer is ready")
+    return get_trainer(mod, train, dev)
+
+
+def test_dataset(file, vocab):
+    test = SNLI(file)
+    test.load_word_vocabulary(vocab)
+    return test
+
+
+def write_to_file(model_name, results, loss, accuracy):
+    loss_acc = open(model_name + "_loss_acc.txt", "wt")
+    loss_acc.write("accuracy = " + str(accuracy) + "\nloss = " + str(loss))
+    loss_acc.close()
+
+
+def load_trainer_and_args(file):
+    model, params, vocab = pickle.load(open(os.path.join("..", "pkl", file + ".trained_model"), "rb"))
     return SNLITrainer(model, params), params, vocab
 
 
-def test_ds(test_src, vocab):
-    test = SNLI(test_src)
-    test.load(vocab)
-
-
-
-if __name__ == '__main__':
-    print(shared.snli_dev)
-    print(shared.snli_train)
-    train = open(shared.snli_train, 'r')
-    dev = open(shared.snli_dev, 'r')
-    trainer = get_trainer(train, dev, shared.glove_txt)
-    print("in train")
-    trainer.train()
-
+def get_trained_model_trainer(model_file, test_file):
+    trainer, params, vocab = load_trainer_and_args(model_file)
+    test = test_dataset(test_file, vocab)
+    return trainer, test
 

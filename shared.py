@@ -91,7 +91,7 @@ class SeqArgs(object):
 
 class MlpArgs(object):
     def __init__(self):
-        self.in_dim = 1200
+        self.in_dim = 1800 * 4
         self.hid_dim1 = 3000
         self.hid_dim2 = 1000
         self.out_dim = 3
@@ -127,7 +127,7 @@ class TrainerArgs(object):
         self.batch = 64
         self.gpu = gpu
         self.epochs = 20
-        self.vrate = 200
+        self.vrate = 2000
 
     def __str__(self):
         s = FORMAT.format(self.__class__.__name__)

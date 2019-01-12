@@ -5,8 +5,7 @@ import torch as tc
 import torch.autograd as ag
 from torch.utils.data import DataLoader, Subset
 import shared
-from shared import SnliArgs, SeqArgs, MlpArgs, CnnCharArgs, TrainerArgs
-from data_handler import SNLI
+import sys
 
 
 class CharLevelBiLSTM(nn.Module):
@@ -109,6 +108,11 @@ class MLP(nn.Module):
         return x
 
 
+def print_progress(i, len_data):
+    sys.stdout.write("\r\r\r%d" % int(100 * (i + 1) / len_data) + "%")
+    sys.stdout.flush()
+
+
 class SNLIModel(nn.Module):
     def __init__(self, models_args: shared.SnliArgs):
         super(SNLIModel, self).__init__()
@@ -154,10 +158,10 @@ class SNLITrainer(object):
 
     def validate_train_and_dev(self, i):
         with tc.no_grad():
-            loss, accuracy = self.validate(self.train_valid)
-            self.loss_train.append((i, loss))
-            self.acc_train.append((i, accuracy))
-            # validate Dev
+            # loss, accuracy = self.validate(self.train_valid)
+            # self.loss_train.append((i, loss))
+            self.acc_train.append((i, 0))#accuracy))
+            # # validate Dev
             if self.dev_loader is not None:
                 loss, accuracy = self.validate(self.dev_loader)
                 self.loss_dev.append((i, loss))
@@ -177,7 +181,7 @@ class SNLITrainer(object):
             # calc number of iteration in current epoch
             len_data = len(self.train_loader)
             for i, (prem, hypo, premw, hypow, pc, hc, label) in enumerate(self.train_loader):
-                print("\r\r\r%d" % int(100 * (i + 1) / len_data) + "%")
+                print_progress(i, len_data)
                 premw, pc, hypow, hc, label = self.create_input_to_model(premw, pc, hypow, hc, label)
                 self.model.zero_grad()
                 output = self.model(premw, pc, hypow, hc)
@@ -186,6 +190,7 @@ class SNLITrainer(object):
                 self.model.optimizer.step()
 
                 if self.vrate and i % self.vrate == 0:
+                    print("")
                     print("validating dev in epoch:" + "\t" + str(epoch + 1) + "/" + str(self.epochs))
                     self.validate_train_and_dev(epoch + (i / len_data))
                     self.model.train()
@@ -196,14 +201,14 @@ class SNLITrainer(object):
         self.model.eval()
         len_data = len(data)
         for i, (p, h, pw, hw, pc, hc, label) in enumerate(data):
-            print("\r\r\r%d" % int(100 * (i + 1) / len_data) + "%")
+            print_progress(i, len_data)
             pw, pc, hw, hc, label = self.create_input_to_model(pw, pc, hw, hc, label)
             output = self.model(pw, pc, hw, hc)
             loss += self.loss_func(output, label)
             # calculate accuracy
             correct += sum([1 if out.item() == lab.item() else 0 for out, lab in zip(tc.argmax(output, dim=1), label)])
             total += label.shape[0]
-
+        print("")
         loss = float(loss / len(data))
         accuracy = correct / total
         print("loss is {}, accuracy is {}".format(loss,accuracy))
@@ -229,7 +234,7 @@ class SNLITrainer(object):
             results = []
             len_data = len(test_data)
             for i, (p, h, pw, hw, pc, hc, label) in enumerate(test_data):
-                print("\r\r\r%d" % int(100 * (i + 1) / len_data) + "%")
+                print_progress(i, len_data)
                 pw, pc, hw, hc, label = self.create_input_to_model(pw, pc, hw, hc, label, is_test=True)
                 output = self.model(pw, pc, hw, hc)
                 loss += self.loss_func(output, label)
@@ -237,6 +242,7 @@ class SNLITrainer(object):
                 total += label.shape[0]
                 for premise, hypothesis, pred in zip(p, h, tc.argmax(output, dim=1)):
                     results.append((dataset.label(pred.item()), " ".join(premise), " ".join(hypothesis)))
+            print("")
             loss = float(loss / len(test_data))
             accuracy = correct / total
             print("loss is {}, accuracy is {}".format(loss, accuracy))

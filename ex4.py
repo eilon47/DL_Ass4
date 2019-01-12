@@ -1,7 +1,10 @@
 import os
 import sys
+import time
 import zipfile
 import requests
+from torch.nn import LSTM
+
 from data_handler import SNLI
 from shared import snli_train, snli_dev, snli_test, glove_txt
 import shared
@@ -101,28 +104,33 @@ def write_results_to_file(file, results, loss, acc):
         fd.write("{}\t\t{}\t\t{}\n".format(l,p,h))
     fd.close()
 
-#
-# option_parser = optparse.OptionParser()
-# option_parser.add_option("--train", dest="train_file", help="path to train file", default=None)
-# option_parser.add_option("--dev" , dest="dev_file", help="path to dev file", default=None)
-# option_parser.add_option("--test" , dest="test_file", help="path to test file", default=None)
-#
-# option_parser.add_option("-")
-#
-# option_parser.add_option("-f", "--fix", help="If you want to use prefix and suffix embedding matrices", dest="F", default=False, action="store_true")
-# option_parser.add_option("-p", "--plot", help="If you want to show plots", dest="plot", default=False, action="store_true")
-# option_parser.add_option("-l", "--lr", dest="lr", help="Choose the learning rate", default=None, type=float)
-# option_parser.add_option("-i", "--iter", dest="epochs", help="Choose the epochs", default=None, type=int)
+current_time = str(time.strftime("%H_%M_%S", time.gmtime(time.time())))
+
+option_parser = optparse.OptionParser()
+option_parser.add_option("--train", dest="train", help="training new model, possible to add name for the model ",
+                         default="model_{}".format(current_time))
+option_parser.add_option("--test", dest="test", help="test run, possible to add model path to load (.pkl)", default=None)
+option_parser.add_option("--run", dest="run", help="running training and test after that", default=False, action="store_true")
 
 
 def main():
+    options, args = option_parser.parse_args()
     prepare()
-    trainer = train.get_new_model_trainer(open(snli_train, "r"), glove_txt ,open(snli_dev, "r"))
-    trainer.train()
-    results, loss, accuracy = trainer.predict(SNLI(open(snli_test, "r"), glove_txt))
-    write_results_to_file("first_time", results, loss, accuracy)
-    print("Done!!!!!!")
-
+    if options.run:
+        trainer, params = train.get_new_model_trainer(glove_txt, open(snli_train, "r"),open(snli_dev, "r"))
+        trainer.train()
+        train.save(trainer, options.train, params, trainer.train_data)
+        results, loss, accuracy = trainer.predict(SNLI(open(snli_test, "r"), glove_txt))
+        write_results_to_file("results", results, loss, accuracy)
+    else:
+        if options.train:
+            trainer, params = train.get_new_model_trainer(glove_txt, open(snli_train, "r"), open(snli_dev, "r"))
+            trainer.train()
+            train.save(trainer, options.train, params, trainer.train_data)
+        if options.test:
+            trainer, params, vocab = train.load_trainer_and_args(options.test)
+            results, loss, accuracy = trainer.predict(SNLI(open(snli_test, "r"), glove_txt))
+            write_results_to_file("results", results, loss, accuracy)
 
 if __name__ == '__main__':
     main()

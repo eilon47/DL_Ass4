@@ -1,5 +1,18 @@
+###################################################################################################
+This app is an implementation of the paper:
 
-Hi,
+Recurrent Neural Network-Based Sentence Encoder with Gated Attention for Natural Language Inference
+by Qian Chen, Xiaodan Zhu, Zhen-Hua Ling, Si Wei, Hui Jiang, Diana Inkpen.
+
+This paper can be found here : https://arxiv.org/pdf/1708.01353.pdf
+
+###################################################################################################
+
+
+###################### Authors #######################
+Eilon Bashari 308576933     Daniel Greenspan 308243948
+######################################################
+
 
 To run this app please use the flags we created as it explain in the help menu (to run the help please run python ex4.py --help).
 Options:
@@ -34,3 +47,5 @@ Folder structure
         snli_1.0.zip - optional
 2.python source files - required
 3.README.txt
+
+
